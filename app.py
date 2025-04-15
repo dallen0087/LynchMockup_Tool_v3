@@ -13,7 +13,7 @@ garments = {
     "ringer_tees": {"preview": "WHITE-BLACK", "colors": ["BLACK-WHITE", "WHITE-BLACK", "WHITE-RED"], "dark_colors": ["BLACK-WHITE"]}
 }
 
-st.title("👕 LynchMockup_Tool v4.1 — Per-Design + Garment Control")
+st.title("🟢🟢LynchMockup_Tool v4.1 — Per-Design + Garment Control")
 
 color_mode = st.selectbox("🎨 Design Color Mode", [
     "Standard (Black/White)", "Blood Red", "Golden Orange", "Royal Blue", "Forest Green", "Unchanged"
@@ -129,7 +129,7 @@ for uploaded_file in uploaded_files:
     design_name = uploaded_file.name.split('.')[0]
     design_path = f"temp_designs/{design_name}.png"
     with open(design_path, "wb") as f:
-        f.write(uploaded_file.read())
+        f.write(uploaded_file.getvalue())
 
 # Export logic
 st.markdown("## 📦 Export All Mockups")
