@@ -13,7 +13,7 @@ garments = {
     "ringer_tees": {"preview": "WHITE-BLACK", "colors": ["BLACK-WHITE", "WHITE-BLACK", "WHITE-RED"], "dark_colors": ["BLACK-WHITE"]}
 }
 
-st.title("👕 LynchMockup_Tool_v3.9 — Safe Smart Rendering")
+st.title("👕 LynchMockup_Tool_v4.0 — Per-Garment Smart Refresh")
 
 color_mode = st.selectbox("🎨 Design Color Mode", [
     "Standard (Black/White)", "Blood Red", "Golden Orange", "Royal Blue", "Forest Green", "Unchanged"
@@ -31,11 +31,13 @@ if "settings" not in st.session_state:
     st.session_state.settings = {}
 if "previews" not in st.session_state:
     st.session_state.previews = {}
+if "refresh_flags" not in st.session_state:
+    st.session_state.refresh_flags = {}
 
 selected_guides = {}
 include_garment = {}
 
-# Build UI
+# UI controls
 for garment in garments:
     with st.expander(f"{garment.replace('_', ' ').title()} Settings", expanded=True):
         include_garment[garment] = st.checkbox("Include in export", value=True, key=f"{garment}_check")
@@ -44,16 +46,14 @@ for garment in garments:
         default_guide_index = available_guides.index("STANDARD") if "STANDARD" in available_guides else 0
         selected_guides[garment] = st.selectbox("Select guide", available_guides, index=default_guide_index, key=f"{garment}_guide")
 
-        scale_key = f"{garment}_scale"
-        offset_key = f"{garment}_offset"
-
-        # Use Streamlit state to track values
-        scale_val = st.slider("Scale within placement box (%)", 50, 100, st.session_state.settings.get(garment, {}).get("scale", 100), key=scale_key)
-        offset_val = st.slider("Vertical offset (px)", -100, 100, st.session_state.settings.get(garment, {}).get("offset", 0), key=offset_key)
-
+        scale_val = st.slider("Scale within placement box (%)", 50, 100, st.session_state.settings.get(garment, {}).get("scale", 100), key=f"{garment}_scale")
+        offset_val = st.slider("Vertical offset (px)", -100, 100, st.session_state.settings.get(garment, {}).get("offset", 0), key=f"{garment}_offset")
         st.session_state.settings[garment] = {"scale": scale_val, "offset": offset_val}
 
-# Previews
+        if st.button(f"🔁 Refresh Preview for {garment}", key=f"{garment}_refresh"):
+            st.session_state.refresh_flags[garment] = True
+
+# Preview logic
 if uploaded_files:
     for uploaded_file in uploaded_files:
         design_name = uploaded_file.name.split('.')[0]
@@ -70,49 +70,56 @@ if uploaded_files:
             if not include_garment[garment]:
                 continue
 
-            guide_path = f"assets/guides/{garment}/{selected_guides[garment]}.png"
-            guide = Image.open(guide_path).convert("RGBA")
-            alpha = np.array(guide.split()[-1])
-            mask = alpha < 10
-            ys, xs = np.where(mask)
-            box_x0, box_y0, box_x1, box_y1 = xs.min(), ys.min(), xs.max(), ys.max()
-            box_w, box_h = box_x1 - box_x0, box_y1 - box_y0
+            key = f"{design_name}_{garment}"
+            refresh = st.session_state.refresh_flags.get(garment, False)
 
-            scale_pct = st.session_state.settings[garment]["scale"]
-            offset_y = st.session_state.settings[garment]["offset"]
+            if refresh or key not in st.session_state.previews:
+                guide_path = f"assets/guides/{garment}/{selected_guides[garment]}.png"
+                guide = Image.open(guide_path).convert("RGBA")
+                alpha = np.array(guide.split()[-1])
+                mask = alpha < 10
+                ys, xs = np.where(mask)
+                box_x0, box_y0, box_x1, box_y1 = xs.min(), ys.min(), xs.max(), ys.max()
+                box_w, box_h = box_x1 - box_x0, box_y1 - box_y0
 
-            target_w = int(box_w * (scale_pct / 100))
-            target_h = int(box_h * (scale_pct / 100))
-            aspect = cropped.width / cropped.height
-            if aspect > (target_w / target_h):
-                new_w = target_w
-                new_h = int(new_w / aspect)
-            else:
-                new_h = target_h
-                new_w = int(new_h * aspect)
+                scale_pct = st.session_state.settings[garment]["scale"]
+                offset_y = st.session_state.settings[garment]["offset"]
 
-            resized = cropped.resize((new_w, new_h), Image.Resampling.LANCZOS)
-            resized_alpha = resized.split()[-1]
+                target_w = int(box_w * (scale_pct / 100))
+                target_h = int(box_h * (scale_pct / 100))
+                aspect = cropped.width / cropped.height
+                if aspect > (target_w / target_h):
+                    new_w = target_w
+                    new_h = int(new_w / aspect)
+                else:
+                    new_h = target_h
+                    new_w = int(new_h * aspect)
 
-            preview_color = config["preview"]
-            preview_path = f"assets/{garment}/{preview_color}.jpg"
-            preview_shirt = Image.open(preview_path).convert("RGBA")
+                resized = cropped.resize((new_w, new_h), Image.Resampling.LANCZOS)
+                resized_alpha = resized.split()[-1]
 
-            if color_mode == "Unchanged":
-                fill = resized.copy()
-            elif color_mode == "Standard (Black/White)":
-                fill_color = "white" if preview_color in config["dark_colors"] else "black"
-                fill = Image.new("RGBA", resized.size, color=fill_color)
-                fill.putalpha(resized_alpha)
-            else:
-                fill = Image.new("RGBA", resized.size, color=color_hex_map[color_mode])
-                fill.putalpha(resized_alpha)
+                preview_color = config["preview"]
+                preview_path = f"assets/{garment}/{preview_color}.jpg"
+                preview_shirt = Image.open(preview_path).convert("RGBA")
 
-            px = box_x0 + (box_w - new_w) // 2
-            py = box_y0 + (box_h - new_h) // 2 + offset_y
-            composed_preview = preview_shirt.copy()
-            composed_preview.paste(fill, (px, py), fill)
+                if color_mode == "Unchanged":
+                    fill = resized.copy()
+                elif color_mode == "Standard (Black/White)":
+                    fill_color = "white" if preview_color in config["dark_colors"] else "black"
+                    fill = Image.new("RGBA", resized.size, color=fill_color)
+                    fill.putalpha(resized_alpha)
+                else:
+                    fill = Image.new("RGBA", resized.size, color=color_hex_map[color_mode])
+                    fill.putalpha(resized_alpha)
+
+                px = box_x0 + (box_w - new_w) // 2
+                py = box_y0 + (box_h - new_h) // 2 + offset_y
+                composed_preview = preview_shirt.copy()
+                composed_preview.paste(fill, (px, py), fill)
+
+                st.session_state.previews[key] = composed_preview.convert("RGB")
+                st.session_state.refresh_flags[garment] = False  # reset
 
             with cols[col_idx]:
-                st.image(composed_preview.convert("RGB"), caption=garment.replace("_", " ").title())
+                st.image(st.session_state.previews[key], caption=garment.replace("_", " ").title())
             col_idx = (col_idx + 1) % len(cols)
