@@ -6,7 +6,31 @@ import zipfile
 import io
 import os
 
-# Garment and color configuration
+# Apply Matrix-style theme
+st.markdown(
+    """
+    <style>
+    html, body, [class*="css"] {
+        background-color: #000000;
+        color: #00FF00;
+        font-family: 'Courier New', monospace;
+    }
+    .stButton>button {
+        background-color: #00FF00;
+        color: #000000;
+        font-weight: bold;
+    }
+    .stDownloadButton>button {
+        background-color: #00FF00;
+        color: #000000;
+        font-weight: bold;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# Garment config
 garments = {
     "tshirts": {
         "preview": "WHITE",
@@ -35,15 +59,11 @@ garments = {
     }
 }
 
-# UI Setup
-st.title("👕 LynchMockup_Tool_v3")
-st.write("Upload a transparent PNG design. You can preview and selectively export garment mockups with custom design colors.")
+# UI
+st.title("👕 LynchMockup_Tool_v3.6 — The Matrix Edition")
+st.write("Upload multiple transparent PNG designs. Apply custom guide and color mode per garment, then export all in one ZIP.")
 
-uploaded_file = st.file_uploader("Upload your design (PNG only)", type=["png"])
-selected_guides = {}
-include_garment = {}
-
-# 🎨 Design color mode
+# Design color mode
 color_mode = st.selectbox("🎨 Design Color Mode", [
     "Standard (Black/White)", "Red", "Golden Orange", "Royal Blue", "Forest Green", "Unchanged"
 ])
@@ -55,7 +75,9 @@ color_hex_map = {
     "Forest Green": "#228B22"
 }
 
-# Guide selector and inclusion toggle per garment
+# Garment controls
+selected_guides = {}
+include_garment = {}
 for garment in garments:
     st.subheader(f"{garment.replace('_', ' ').title()}")
     include_garment[garment] = st.checkbox(f"Include {garment.replace('_', ' ').title()} in export", value=True)
@@ -64,61 +86,46 @@ for garment in garments:
     selected = st.selectbox(f"Select guide for {garment}", available_guides, key=garment)
     selected_guides[garment] = selected
 
-# Preview and export
-if uploaded_file:
-    st.subheader("Preview")
-    design = Image.open(uploaded_file).convert("RGBA")
-    alpha = design.split()[-1]
-    bbox = alpha.getbbox()
-    cropped = design.crop(bbox)
+# Upload multiple designs
+uploaded_files = st.file_uploader("Upload PNG design files", type=["png"], accept_multiple_files=True)
 
+# Process
+if uploaded_files:
     output_zip = io.BytesIO()
     with zipfile.ZipFile(output_zip, 'w') as zipf:
-        for garment, config in garments.items():
-            guide_path = f"assets/guides/{garment}/{selected_guides[garment]}.png"
-            guide = Image.open(guide_path).convert("RGBA")
+        for uploaded_file in uploaded_files:
+            design_name = uploaded_file.name.split('.')[0]
+            design = Image.open(uploaded_file).convert("RGBA")
+            alpha = design.split()[-1]
+            bbox = alpha.getbbox()
+            cropped = design.crop(bbox)
 
-            # Detect placement box
-            alpha = np.array(guide.split()[-1])
-            mask = alpha < 10
-            ys, xs = np.where(mask)
-            box_x0, box_y0, box_x1, box_y1 = xs.min(), ys.min(), xs.max(), ys.max()
-            box_w, box_h = box_x1 - box_x0, box_y1 - box_y0
+            for garment, config in garments.items():
+                if not include_garment[garment]:
+                    continue
 
-            # Resize to fit box
-            aspect = cropped.width / cropped.height
-            if aspect > (box_w / box_h):
-                new_w = box_w
-                new_h = int(new_w / aspect)
-            else:
-                new_h = box_h
-                new_w = int(new_h * aspect)
+                guide_path = f"assets/guides/{garment}/{selected_guides[garment]}.png"
+                guide = Image.open(guide_path).convert("RGBA")
 
-            resized = cropped.resize((new_w, new_h), Image.Resampling.LANCZOS)
-            resized_alpha = resized.split()[-1]
+                # Detect placement box
+                alpha = np.array(guide.split()[-1])
+                mask = alpha < 10
+                ys, xs = np.where(mask)
+                box_x0, box_y0, box_x1, box_y1 = xs.min(), ys.min(), xs.max(), ys.max()
+                box_w, box_h = box_x1 - box_x0, box_y1 - box_y0
 
-            # Render preview
-            preview_color = config["preview"]
-            preview_path = f"assets/{garment}/{preview_color}.jpg"
-            preview_shirt = Image.open(preview_path).convert("RGBA")
+                # Resize
+                aspect = cropped.width / cropped.height
+                if aspect > (box_w / box_h):
+                    new_w = box_w
+                    new_h = int(new_w / aspect)
+                else:
+                    new_h = box_h
+                    new_w = int(new_h * aspect)
 
-            if color_mode == "Unchanged":
-                fill = resized.copy()
-            elif color_mode == "Standard (Black/White)":
-                fill_color = "white" if preview_color in config["dark_colors"] else "black"
-                fill = Image.new("RGBA", resized.size, color=fill_color)
-                fill.putalpha(resized_alpha)
-            else:
-                fill = Image.new("RGBA", resized.size, color=color_hex_map[color_mode])
-                fill.putalpha(resized_alpha)
+                resized = cropped.resize((new_w, new_h), Image.Resampling.LANCZOS)
+                resized_alpha = resized.split()[-1]
 
-            px = box_x0 + (box_w - new_w) // 2
-            py = box_y0 + (box_h - new_h) // 2
-            composed_preview = preview_shirt.copy()
-            composed_preview.paste(fill, (px, py), fill)
-            st.image(composed_preview.convert("RGB"), caption=f"{garment.replace('_', ' ').title()} - {preview_color}", use_container_width=True)
-
-            if include_garment[garment]:
                 for color in config["colors"]:
                     shirt_path = f"assets/{garment}/{color}.jpg"
                     if not os.path.exists(shirt_path):
@@ -135,12 +142,14 @@ if uploaded_file:
                         fill = Image.new("RGBA", resized.size, color=color_hex_map[color_mode])
                         fill.putalpha(resized_alpha)
 
+                    px = box_x0 + (box_w - new_w) // 2
+                    py = box_y0 + (box_h - new_h) // 2
                     composed = shirt.copy()
                     composed.paste(fill, (px, py), fill)
-                    filename = f"{uploaded_file.name.split('.')[0]}_{garment}_{color}.jpg"
+                    filename = f"{design_name}_{garment}_{color}.jpg"
                     img_bytes = io.BytesIO()
                     composed.convert("RGB").save(img_bytes, format="JPEG")
                     zipf.writestr(filename, img_bytes.getvalue())
 
-    st.success("Mockups ready! Click below to download.")
-    st.download_button("📦 Download ZIP", output_zip.getvalue(), file_name="mockups.zip", mime="application/zip")
+    st.success("All mockups are ready! Click below to download.")
+    st.download_button("📦 Download All Mockups (ZIP)", output_zip.getvalue(), file_name="all_mockups.zip", mime="application/zip")
