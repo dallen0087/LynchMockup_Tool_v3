@@ -6,22 +6,25 @@ import zipfile
 import io
 import os
 
-# Matrix-style theme
+# Matrix theme — enhanced for all controls
 st.markdown(
     """
     <style>
     html, body, [class*="css"] {
         background-color: #000000;
-        color: #00FF00;
+        color: #00FF00 !important;
         font-family: 'Courier New', monospace;
     }
+    .stCheckbox > div, .stSelectbox > div {
+        color: #00FF00 !important;
+    }
     .stButton>button, .stDownloadButton>button {
-        background-color: #00FF00;
-        color: #000000;
+        background-color: #00FF00 !important;
+        color: #000000 !important;
         font-weight: bold;
     }
-    img {
-        max-height: 300px;
+    .stImage img {
+        border: 1px solid #00FF00;
     }
     </style>
     """,
@@ -57,7 +60,6 @@ garments = {
     }
 }
 
-# UI
 st.title("👕 LynchMockup_Tool_v3.6 — The Matrix Edition")
 st.write("Upload multiple PNGs. Preview all garments. Export in one ZIP.")
 
@@ -78,8 +80,9 @@ for garment in garments:
     st.subheader(f"{garment.replace('_', ' ').title()}")
     include_garment[garment] = st.checkbox(f"Include in export", value=True, key=f"{garment}_check")
     guide_folder = f"assets/guides/{garment}"
-    available_guides = [f.split(".")[0] for f in os.listdir(guide_folder) if f.endswith(".png")]
-    selected = st.selectbox("Select guide", available_guides, key=f"{garment}_guide")
+    available_guides = sorted([f.split(".")[0] for f in os.listdir(guide_folder) if f.endswith(".png")])
+    default_guide_index = available_guides.index("STANDARD") if "STANDARD" in available_guides else 0
+    selected = st.selectbox("Select guide", available_guides, index=default_guide_index, key=f"{garment}_guide")
     selected_guides[garment] = selected
 
 uploaded_files = st.file_uploader("Upload PNG design files", type=["png"], accept_multiple_files=True)
