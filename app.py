@@ -2,8 +2,6 @@
 import streamlit as st
 from PIL import Image
 import numpy as np
-import zipfile
-import io
 import os
 
 # Garment config
@@ -15,7 +13,7 @@ garments = {
     "ringer_tees": {"preview": "WHITE-BLACK", "colors": ["BLACK-WHITE", "WHITE-BLACK", "WHITE-RED"], "dark_colors": ["BLACK-WHITE"]}
 }
 
-st.title("👕 LynchMockup_Tool_v3.9 — Smart Preview Rendering")
+st.title("👕 LynchMockup_Tool_v3.9 — Safe Smart Rendering")
 
 color_mode = st.selectbox("🎨 Design Color Mode", [
     "Standard (Black/White)", "Blood Red", "Golden Orange", "Royal Blue", "Forest Green", "Unchanged"
@@ -27,20 +25,17 @@ color_hex_map = {
     "Forest Green": "#228B22"
 }
 
-# Upload designs
 uploaded_files = st.file_uploader("Upload PNG design files", type=["png"], accept_multiple_files=True)
 
-# Track state
 if "settings" not in st.session_state:
     st.session_state.settings = {}
 if "previews" not in st.session_state:
     st.session_state.previews = {}
 
-# Controls
 selected_guides = {}
 include_garment = {}
 
-# Garment settings block
+# Build UI
 for garment in garments:
     with st.expander(f"{garment.replace('_', ' ').title()} Settings", expanded=True):
         include_garment[garment] = st.checkbox("Include in export", value=True, key=f"{garment}_check")
@@ -52,12 +47,13 @@ for garment in garments:
         scale_key = f"{garment}_scale"
         offset_key = f"{garment}_offset"
 
-        st.session_state.settings[garment] = {
-            "scale": st.slider("Scale within placement box (%)", 50, 100, st.session_state.settings.get(garment, {}).get("scale", 100), key=scale_key),
-            "offset": st.slider("Vertical offset (px)", -100, 100, st.session_state.settings.get(garment, {}).get("offset", 0), key=offset_key)
-        }
+        # Use Streamlit state to track values
+        scale_val = st.slider("Scale within placement box (%)", 50, 100, st.session_state.settings.get(garment, {}).get("scale", 100), key=scale_key)
+        offset_val = st.slider("Vertical offset (px)", -100, 100, st.session_state.settings.get(garment, {}).get("offset", 0), key=offset_key)
 
-# Generate previews only when slider changes
+        st.session_state.settings[garment] = {"scale": scale_val, "offset": offset_val}
+
+# Previews
 if uploaded_files:
     for uploaded_file in uploaded_files:
         design_name = uploaded_file.name.split('.')[0]
@@ -117,8 +113,6 @@ if uploaded_files:
             composed_preview = preview_shirt.copy()
             composed_preview.paste(fill, (px, py), fill)
 
-            st.session_state.previews[f"{design_name}_{garment}"] = composed_preview.convert("RGB")
-
             with cols[col_idx]:
-                st.image(st.session_state.previews[f"{design_name}_{garment}"], caption=garment.replace("_", " ").title())
+                st.image(composed_preview.convert("RGB"), caption=garment.replace("_", " ").title())
             col_idx = (col_idx + 1) % len(cols)
