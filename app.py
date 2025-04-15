@@ -35,8 +35,12 @@ garments = {
     }
 }
 
-st.title("👕 LynchMockup_Tool_v3.6")
+st.title("👕 LynchMockup_Tool_v3.7")
 st.write("Upload multiple PNGs. Preview all garments. Export in one ZIP.")
+
+# Placement tweaks
+scale_pct = st.slider("Design Scale within Box (%)", 50, 100, 100)
+offset_y = st.slider("Vertical Offset (px)", -100, 100, 0)
 
 color_mode = st.selectbox("🎨 Design Color Mode", [
     "Standard (Black/White)", "Blood Red", "Golden Orange", "Royal Blue", "Forest Green", "Unchanged"
@@ -89,12 +93,14 @@ if uploaded_files:
                 box_x0, box_y0, box_x1, box_y1 = xs.min(), ys.min(), xs.max(), ys.max()
                 box_w, box_h = box_x1 - box_x0, box_y1 - box_y0
 
+                target_w = int(box_w * (scale_pct / 100))
+                target_h = int(box_h * (scale_pct / 100))
                 aspect = cropped.width / cropped.height
-                if aspect > (box_w / box_h):
-                    new_w = box_w
+                if aspect > (target_w / target_h):
+                    new_w = target_w
                     new_h = int(new_w / aspect)
                 else:
-                    new_h = box_h
+                    new_h = target_h
                     new_w = int(new_h * aspect)
 
                 resized = cropped.resize((new_w, new_h), Image.Resampling.LANCZOS)
@@ -115,7 +121,7 @@ if uploaded_files:
                     fill.putalpha(resized_alpha)
 
                 px = box_x0 + (box_w - new_w) // 2
-                py = box_y0 + (box_h - new_h) // 2
+                py = box_y0 + (box_h - new_h) // 2 + offset_y
                 composed_preview = preview_shirt.copy()
                 composed_preview.paste(fill, (px, py), fill)
 
