@@ -118,6 +118,18 @@ if uploaded_files:
             col_idx = (col_idx + 1) % len(cols)
 
 import zipfile
+import io
+import os
+
+# Save uploaded images to disk so they can be reopened during export
+if not os.path.exists("temp_designs"):
+    os.makedirs("temp_designs")
+
+for uploaded_file in uploaded_files:
+    design_name = uploaded_file.name.split('.')[0]
+    design_path = f"temp_designs/{design_name}.png"
+    with open(design_path, "wb") as f:
+        f.write(uploaded_file.read())
 
 # Export logic
 st.markdown("## 📦 Export All Mockups")
@@ -134,8 +146,6 @@ if st.button("📁 Generate and Download ZIP"):
                     continue
 
                 shirt = Image.open(preview_path).convert("RGBA")
-                preview = preview_img.convert("RGBA")
-
                 scale = st.session_state.settings[combo_key]["scale"]
                 offset_y = st.session_state.settings[combo_key]["offset"]
                 guide_name = st.session_state.settings[combo_key]["guide"]
@@ -148,8 +158,7 @@ if st.button("📁 Generate and Download ZIP"):
                 box_x0, box_y0, box_x1, box_y1 = xs.min(), ys.min(), xs.max(), ys.max()
                 box_w, box_h = box_x1 - box_x0, box_y1 - box_y0
 
-                # Reapply design
-                design = Image.open(f"uploads/{design_name}.png").convert("RGBA")
+                design = Image.open(f"temp_designs/{design_name}.png").convert("RGBA")
                 alpha = design.split()[-1]
                 bbox = alpha.getbbox()
                 cropped = design.crop(bbox)
