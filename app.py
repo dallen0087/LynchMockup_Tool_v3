@@ -6,31 +6,6 @@ import zipfile
 import io
 import os
 
-# Matrix theme — enhanced for all controls
-st.markdown(
-    """
-    <style>
-    html, body, [class*="css"] {
-        background-color: #000000;
-        color: #00FF00 !important;
-        font-family: 'Courier New', monospace;
-    }
-    .stCheckbox > div, .stSelectbox > div {
-        color: #00FF00 !important;
-    }
-    .stButton>button, .stDownloadButton>button {
-        background-color: #00FF00 !important;
-        color: #000000 !important;
-        font-weight: bold;
-    }
-    .stImage img {
-        border: 1px solid #00FF00;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
 # Garment config
 garments = {
     "tshirts": {
@@ -60,14 +35,14 @@ garments = {
     }
 }
 
-st.title("👕 LynchMockup_Tool_v3.6 — The Matrix Edition")
+st.title("👕 LynchMockup_Tool_v3.6")
 st.write("Upload multiple PNGs. Preview all garments. Export in one ZIP.")
 
 color_mode = st.selectbox("🎨 Design Color Mode", [
-    "Standard (Black/White)", "Red", "Golden Orange", "Royal Blue", "Forest Green", "Unchanged"
+    "Standard (Black/White)", "Blood Red", "Golden Orange", "Royal Blue", "Forest Green", "Unchanged"
 ])
 color_hex_map = {
-    "Red": "#FF0000",
+    "Blood Red": "#780606",
     "Golden Orange": "#FFA500",
     "Royal Blue": "#4169E1",
     "Forest Green": "#228B22"
