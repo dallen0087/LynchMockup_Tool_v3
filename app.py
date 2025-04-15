@@ -8,39 +8,14 @@ import os
 
 # Garment config
 garments = {
-    "tshirts": {
-        "preview": "WHITE",
-        "colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE", "PINK", "WHITE", "YELLOW"],
-        "dark_colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE"]
-    },
-    "crop_tops": {
-        "preview": "WHITE",
-        "colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE", "PINK", "WHITE", "RED"],
-        "dark_colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE"]
-    },
-    "hoodies": {
-        "preview": "BLACK",
-        "colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE", "PINK", "GREY", "YELLOW"],
-        "dark_colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE"]
-    },
-    "sweatshirts": {
-        "preview": "PINK",
-        "colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE", "PINK", "GREY", "YELLOW"],
-        "dark_colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE"]
-    },
-    "ringer_tees": {
-        "preview": "WHITE-BLACK",
-        "colors": ["BLACK-WHITE", "WHITE-BLACK", "WHITE-RED"],
-        "dark_colors": ["BLACK-WHITE"]
-    }
+    "tshirts": {"preview": "WHITE", "colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE", "PINK", "WHITE", "YELLOW"], "dark_colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE"]},
+    "crop_tops": {"preview": "WHITE", "colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE", "PINK", "WHITE", "RED"], "dark_colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE"]},
+    "hoodies": {"preview": "BLACK", "colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE", "PINK", "GREY", "YELLOW"], "dark_colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE"]},
+    "sweatshirts": {"preview": "PINK", "colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE", "PINK", "GREY", "YELLOW"], "dark_colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE"]},
+    "ringer_tees": {"preview": "WHITE-BLACK", "colors": ["BLACK-WHITE", "WHITE-BLACK", "WHITE-RED"], "dark_colors": ["BLACK-WHITE"]}
 }
 
-st.title("👕 LynchMockup_Tool_v3.7")
-st.write("Upload multiple PNGs. Preview all garments. Export in one ZIP.")
-
-# Placement tweaks
-scale_pct = st.slider("Design Scale within Box (%)", 50, 100, 100)
-offset_y = st.slider("Vertical Offset (px)", -100, 100, 0)
+st.title("👕 LynchMockup_Tool_v3.8 — Per-Garment Placement Control")
 
 color_mode = st.selectbox("🎨 Design Color Mode", [
     "Standard (Black/White)", "Blood Red", "Golden Orange", "Royal Blue", "Forest Green", "Unchanged"
@@ -52,17 +27,20 @@ color_hex_map = {
     "Forest Green": "#228B22"
 }
 
-# Controls
 selected_guides = {}
 include_garment = {}
+scale_settings = {}
+offset_settings = {}
+
 for garment in garments:
-    st.subheader(f"{garment.replace('_', ' ').title()}")
-    include_garment[garment] = st.checkbox(f"Include in export", value=True, key=f"{garment}_check")
-    guide_folder = f"assets/guides/{garment}"
-    available_guides = sorted([f.split(".")[0] for f in os.listdir(guide_folder) if f.endswith(".png")])
-    default_guide_index = available_guides.index("STANDARD") if "STANDARD" in available_guides else 0
-    selected = st.selectbox("Select guide", available_guides, index=default_guide_index, key=f"{garment}_guide")
-    selected_guides[garment] = selected
+    with st.expander(f"{garment.replace('_', ' ').title()} Settings", expanded=True):
+        include_garment[garment] = st.checkbox("Include in export", value=True, key=f"{garment}_check")
+        guide_folder = f"assets/guides/{garment}"
+        available_guides = sorted([f.split(".")[0] for f in os.listdir(guide_folder) if f.endswith(".png")])
+        default_guide_index = available_guides.index("STANDARD") if "STANDARD" in available_guides else 0
+        selected_guides[garment] = st.selectbox("Select guide", available_guides, index=default_guide_index, key=f"{garment}_guide")
+        scale_settings[garment] = st.slider("Scale within placement box (%)", 50, 100, 100, key=f"{garment}_scale")
+        offset_settings[garment] = st.slider("Vertical offset (px)", -100, 100, 0, key=f"{garment}_offset")
 
 uploaded_files = st.file_uploader("Upload PNG design files", type=["png"], accept_multiple_files=True)
 
@@ -92,6 +70,9 @@ if uploaded_files:
                 ys, xs = np.where(mask)
                 box_x0, box_y0, box_x1, box_y1 = xs.min(), ys.min(), xs.max(), ys.max()
                 box_w, box_h = box_x1 - box_x0, box_y1 - box_y0
+
+                scale_pct = scale_settings[garment]
+                offset_y = offset_settings[garment]
 
                 target_w = int(box_w * (scale_pct / 100))
                 target_h = int(box_h * (scale_pct / 100))
