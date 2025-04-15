@@ -9,22 +9,27 @@ import os
 # Garment and color configuration
 garments = {
     "tshirts": {
+        "preview": "WHITE",
         "colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE", "PINK", "WHITE", "YELLOW"],
         "dark_colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE"]
     },
     "crop_tops": {
+        "preview": "WHITE",
         "colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE", "PINK", "WHITE", "RED"],
         "dark_colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE"]
     },
     "hoodies": {
+        "preview": "BLACK",
         "colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE", "PINK", "GREY", "YELLOW"],
         "dark_colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE"]
     },
     "sweatshirts": {
+        "preview": "PINK",
         "colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE", "PINK", "GREY", "YELLOW"],
         "dark_colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE"]
     },
     "ringer_tees": {
+        "preview": "WHITE-BLACK",
         "colors": ["BLACK-WHITE", "WHITE-BLACK", "WHITE-RED"],
         "dark_colors": ["BLACK-WHITE"]
     }
@@ -32,7 +37,7 @@ garments = {
 
 # UI Setup
 st.title("👕 LynchMockup_Tool_v3")
-st.write("Upload a transparent PNG design. It will be applied to each garment and exported as a ZIP.")
+st.write("Upload a transparent PNG design. It will be applied to each garment using the selected guide and shown as a preview. Full ZIP download available.")
 
 uploaded_file = st.file_uploader("Upload your design (PNG only)", type=["png"])
 selected_guides = {}
@@ -78,6 +83,20 @@ if uploaded_file:
             resized = cropped.resize((new_w, new_h), Image.Resampling.LANCZOS)
             resized_alpha = resized.split()[-1]
 
+            # Render preview
+            preview_color = config["preview"]
+            preview_path = f"assets/{garment}/{preview_color}.jpg"
+            preview_shirt = Image.open(preview_path).convert("RGBA")
+            fill_color = "white" if preview_color in config["dark_colors"] else "black"
+            fill = Image.new("RGBA", resized.size, color=fill_color)
+            fill.putalpha(resized_alpha)
+            px = box_x0 + (box_w - new_w) // 2
+            py = box_y0 + (box_h - new_h) // 2
+            composed_preview = preview_shirt.copy()
+            composed_preview.paste(fill, (px, py), fill)
+            st.image(composed_preview.convert("RGB"), caption=f"{garment.replace('_', ' ').title()} - {preview_color}", use_container_width=True)
+
+            # ZIP export for all colors
             for color in config["colors"]:
                 shirt_path = f"assets/{garment}/{color}.jpg"
                 if not os.path.exists(shirt_path):
@@ -88,8 +107,6 @@ if uploaded_file:
                 fill = Image.new("RGBA", resized.size, color=fill_color)
                 fill.putalpha(resized_alpha)
 
-                px = box_x0 + (box_w - new_w) // 2
-                py = box_y0 + (box_h - new_h) // 2
                 composed = shirt.copy()
                 composed.paste(fill, (px, py), fill)
 
