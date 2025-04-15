@@ -1,0 +1,98 @@
+
+import streamlit as st
+from PIL import Image, ImageOps
+import numpy as np
+import zipfile
+import io
+import os
+
+# Garment and color configuration
+garments = {
+    "tshirts": {
+        "preview": "WHITE",
+        "dark_colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE"],
+        "light_colors": ["PINK", "WHITE", "YELLOW"]
+    },
+    "crop_tops": {
+        "preview": "WHITE",
+        "dark_colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE"],
+        "light_colors": ["PINK", "WHITE", "RED"]
+    },
+    "hoodies": {
+        "preview": "BLACK",
+        "dark_colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE"],
+        "light_colors": ["PINK", "GREY", "YELLOW"]
+    },
+    "sweatshirts": {
+        "preview": "PINK",
+        "dark_colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE"],
+        "light_colors": ["PINK", "GREY", "YELLOW"]
+    },
+    "ringer_tees": {
+        "preview": "WHITE-BLACK",
+        "dark_colors": ["BLACK-WHITE"],
+        "light_colors": ["WHITE-BLACK", "WHITE-RED"]
+    }
+}
+
+# UI Setup
+st.title("👕 LynchMockup_Tool_v3")
+st.write("Upload a transparent PNG design. It will be applied to each garment using independently selected placement guides.")
+
+uploaded_file = st.file_uploader("Upload your design (PNG only)", type=["png"])
+selected_guides = {}
+
+# Guide selector per garment
+for garment in garments:
+    st.subheader(f"{garment.replace('_', ' ').title()}")
+    guide_folder = f"assets/guides/{garment}"
+    available_guides = [f.split(".")[0] for f in os.listdir(guide_folder) if f.endswith(".png")]
+    selected = st.selectbox(f"Select guide for {garment}", available_guides, key=garment)
+    selected_guides[garment] = selected
+
+# Process and preview
+if uploaded_file:
+    st.subheader("Preview")
+    design = Image.open(uploaded_file).convert("RGBA")
+    alpha = design.split()[-1]
+    bbox = alpha.getbbox()
+    cropped = design.crop(bbox)
+
+    for garment, config in garments.items():
+        color = config["preview"]
+        guide_path = f"assets/guides/{garment}/{selected_guides[garment]}.png"
+        shirt_path = f"assets/{garment}/{color}.jpg"
+
+        guide = Image.open(guide_path).convert("RGBA")
+        shirt = Image.open(shirt_path).convert("RGBA")
+
+        # Detect placement box
+        alpha = np.array(guide.split()[-1])
+        mask = alpha < 10
+        ys, xs = np.where(mask)
+        box_x0, box_y0, box_x1, box_y1 = xs.min(), ys.min(), xs.max(), ys.max()
+        box_w, box_h = box_x1 - box_x0, box_y1 - box_y0
+
+        # Resize to fit box
+        aspect = cropped.width / cropped.height
+        if aspect > (box_w / box_h):
+            new_w = box_w
+            new_h = int(new_w / aspect)
+        else:
+            new_h = box_h
+            new_w = int(new_h * aspect)
+
+        resized = cropped.resize((new_w, new_h), Image.Resampling.LANCZOS)
+        resized_alpha = resized.split()[-1]
+
+        # Determine color
+        fill_color = "white" if color in config["dark_colors"] else "black"
+        fill = Image.new("RGBA", resized.size, color=fill_color)
+        fill.putalpha(resized_alpha)
+
+        px = box_x0 + (box_w - new_w) // 2
+        py = box_y0 + (box_h - new_h) // 2
+        composed = shirt.copy()
+        composed.paste(fill, (px, py), fill)
+
+        st.image(composed.convert("RGB"), caption=f"{garment.replace('_', ' ').title()} - {color}", use_container_width=True)
