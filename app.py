@@ -27,10 +27,13 @@ color_hex_map = {
     "Forest Green": "#228B22"
 }
 
+# Controls stored per garment
 selected_guides = {}
 include_garment = {}
 scale_settings = {}
 offset_settings = {}
+
+uploaded_files = st.file_uploader("Upload PNG design files", type=["png"], accept_multiple_files=True)
 
 for garment in garments:
     with st.expander(f"{garment.replace('_', ' ').title()} Settings", expanded=True):
@@ -41,8 +44,6 @@ for garment in garments:
         selected_guides[garment] = st.selectbox("Select guide", available_guides, index=default_guide_index, key=f"{garment}_guide")
         scale_settings[garment] = st.slider("Scale within placement box (%)", 50, 100, 100, key=f"{garment}_scale")
         offset_settings[garment] = st.slider("Vertical offset (px)", -100, 100, 0, key=f"{garment}_offset")
-
-uploaded_files = st.file_uploader("Upload PNG design files", type=["png"], accept_multiple_files=True)
 
 if uploaded_files:
     output_zip = io.BytesIO()
@@ -62,6 +63,8 @@ if uploaded_files:
                 if not include_garment[garment]:
                     continue
 
+                scale_pct = scale_settings[garment]
+                offset_y = offset_settings[garment]
                 guide_path = f"assets/guides/{garment}/{selected_guides[garment]}.png"
                 guide = Image.open(guide_path).convert("RGBA")
 
@@ -70,9 +73,6 @@ if uploaded_files:
                 ys, xs = np.where(mask)
                 box_x0, box_y0, box_x1, box_y1 = xs.min(), ys.min(), xs.max(), ys.max()
                 box_w, box_h = box_x1 - box_x0, box_y1 - box_y0
-
-                scale_pct = scale_settings[garment]
-                offset_y = offset_settings[garment]
 
                 target_w = int(box_w * (scale_pct / 100))
                 target_h = int(box_h * (scale_pct / 100))
