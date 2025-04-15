@@ -13,7 +13,7 @@ garments = {
     "ringer_tees": {"preview": "WHITE-BLACK", "colors": ["BLACK-WHITE", "WHITE-BLACK", "WHITE-RED"], "dark_colors": ["BLACK-WHITE"]}
 }
 
-st.title("🟢🟢LynchMockup_Tool v4.1 — Per-Design + Garment Control")
+st.title("🟢🟢THE-SHIRT-MATRIX-🟢🟢")
 
 color_mode = st.selectbox("🎨 Design Color Mode", [
     "Standard (Black/White)", "Blood Red", "Golden Orange", "Royal Blue", "Forest Green", "Unchanged"
