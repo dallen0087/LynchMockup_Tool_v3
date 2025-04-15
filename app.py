@@ -116,3 +116,75 @@ if uploaded_files:
             with cols[col_idx]:
                 st.image(st.session_state.previews[combo_key], caption=f"{garment.replace('_', ' ').title()}")
             col_idx = (col_idx + 1) % len(cols)
+
+import zipfile
+
+# Export logic
+st.markdown("## 📦 Export All Mockups")
+
+if st.button("📁 Generate and Download ZIP"):
+    output_zip = io.BytesIO()
+    with zipfile.ZipFile(output_zip, 'w') as zipf:
+        for combo_key, preview_img in st.session_state.previews.items():
+            design_name, garment = combo_key.split("_", 1)
+            for color in garments[garment]["colors"]:
+                preview_color = color
+                preview_path = f"assets/{garment}/{preview_color}.jpg"
+                if not os.path.exists(preview_path):
+                    continue
+
+                shirt = Image.open(preview_path).convert("RGBA")
+                preview = preview_img.convert("RGBA")
+
+                scale = st.session_state.settings[combo_key]["scale"]
+                offset_y = st.session_state.settings[combo_key]["offset"]
+                guide_name = st.session_state.settings[combo_key]["guide"]
+                guide_path = f"assets/guides/{garment}/{guide_name}.png"
+
+                guide = Image.open(guide_path).convert("RGBA")
+                alpha = np.array(guide.split()[-1])
+                mask = alpha < 10
+                ys, xs = np.where(mask)
+                box_x0, box_y0, box_x1, box_y1 = xs.min(), ys.min(), xs.max(), ys.max()
+                box_w, box_h = box_x1 - box_x0, box_y1 - box_y0
+
+                # Reapply design
+                design = Image.open(f"uploads/{design_name}.png").convert("RGBA")
+                alpha = design.split()[-1]
+                bbox = alpha.getbbox()
+                cropped = design.crop(bbox)
+
+                target_w = int(box_w * (scale / 100))
+                target_h = int(box_h * (scale / 100))
+                aspect = cropped.width / cropped.height
+                if aspect > (target_w / target_h):
+                    new_w = target_w
+                    new_h = int(new_w / aspect)
+                else:
+                    new_h = target_h
+                    new_w = int(new_h * aspect)
+
+                resized = cropped.resize((new_w, new_h), Image.Resampling.LANCZOS)
+                resized_alpha = resized.split()[-1]
+
+                if color_mode == "Unchanged":
+                    fill = resized.copy()
+                elif color_mode == "Standard (Black/White)":
+                    fill_color = "white" if color in garments[garment]["dark_colors"] else "black"
+                    fill = Image.new("RGBA", resized.size, color=fill_color)
+                    fill.putalpha(resized_alpha)
+                else:
+                    fill = Image.new("RGBA", resized.size, color=color_hex_map[color_mode])
+                    fill.putalpha(resized_alpha)
+
+                px = box_x0 + (box_w - new_w) // 2
+                py = box_y0 + (box_h - new_h) // 2 + offset_y
+                composed = shirt.copy()
+                composed.paste(fill, (px, py), fill)
+
+                filename = f"{design_name}_{garment}_{color}.jpg"
+                img_bytes = io.BytesIO()
+                composed.convert("RGB").save(img_bytes, format="JPEG")
+                zipf.writestr(filename, img_bytes.getvalue())
+
+    st.download_button("⬇️ Download ZIP", output_zip.getvalue(), file_name="mockups.zip", mime="application/zip")
