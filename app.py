@@ -158,12 +158,41 @@ if uploaded_files:
                 st.session_state.settings[combo_key] = buf.copy()
         st.success("All adjusted previews refreshed.")
 
-    st.markdown("## 📦 Export All Mockups")
+        st.markdown("## 📦 Export All Mockups")
     if st.button("📁 Generate and Download ZIP"):
         output_zip = io.BytesIO()
         with zipfile.ZipFile(output_zip, 'w') as zipf:
-            for key, img in st.session_state.previews.items():
-                img_bytes = io.BytesIO()
-                img.save(img_bytes, format="JPEG")
-                zipf.writestr(f"{key}.jpg", img_bytes.getvalue())
+            for uploaded_file in uploaded_files:
+                design_name = uploaded_file.name.split('.')[0]
+                design_path = f"temp_designs/{design_name}.png"
+                design = Image.open(design_path).convert("RGBA")
+                alpha = design.split()[-1]
+                bbox = alpha.getbbox()
+                cropped = design.crop(bbox)
+
+                for garment, config in garments.items():
+                    combo_key = f"{design_name}_{garment}"
+                    settings = st.session_state.settings.get(combo_key, {
+                        "scale": 100, "offset": 0, "guide": "STANDARD", "preview": config["preview"]
+                    })
+
+                    for color in config["colors"]:
+                        shirt_path = f"assets/{garment}/{color}.jpg"
+                        guide_path = f"assets/guides/{garment}/{settings['guide']}.png"
+                        if not os.path.exists(shirt_path) or not os.path.exists(guide_path):
+                            continue
+
+                        shirt_img = Image.open(shirt_path).convert("RGBA")
+                        guide_img = Image.open(guide_path).convert("RGBA")
+                        settings["preview"] = color
+                        composed = render_preview(
+                            cropped, guide_img, shirt_img, settings,
+                            color_mode, config["dark_colors"], color_hex_map
+                        )
+
+                        filename = f"{design_name}_{garment}_{color}.jpg"
+                        img_bytes = io.BytesIO()
+                        composed.save(img_bytes, format="JPEG")
+                        zipf.writestr(filename, img_bytes.getvalue())
+
         st.download_button("⬇️ Download ZIP", output_zip.getvalue(), file_name="mockups.zip", mime="application/zip")
