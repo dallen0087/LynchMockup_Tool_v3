@@ -6,9 +6,8 @@ import io
 import os
 
 st.set_page_config(layout="wide")
-st.title("👕 LynchMockup_Tool v4.6 — Optimized Stability & Refresh Control")
+st.title("👕 LynchMockup_Tool v4.7 — Buffered UI / Manual Refresh / Max Stability")
 
-# Garment Config
 garments = {
     "tshirts": {"preview": "WHITE", "colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE", "PINK", "WHITE", "YELLOW"], "dark_colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE"]},
     "crop_tops": {"preview": "WHITE", "colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE", "PINK", "WHITE", "RED"], "dark_colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE"]},
@@ -31,6 +30,8 @@ uploaded_files = st.file_uploader("Upload PNG design files", type=["png"], accep
 
 if "settings" not in st.session_state:
     st.session_state.settings = {}
+if "buffer_ui" not in st.session_state:
+    st.session_state.buffer_ui = {}
 if "copied_settings" not in st.session_state:
     st.session_state.copied_settings = {}
 if "previews" not in st.session_state:
@@ -59,38 +60,40 @@ if uploaded_files:
             combo_key = f"{design_name}_{garment}"
             if combo_key not in st.session_state.settings:
                 st.session_state.settings[combo_key] = {"scale": 100, "offset": 0, "guide": "STANDARD"}
+            if combo_key not in st.session_state.buffer_ui:
+                st.session_state.buffer_ui[combo_key] = st.session_state.settings[combo_key].copy()
             if combo_key not in st.session_state.rendered_once:
                 st.session_state.rendered_once[combo_key] = False
 
+            buf = st.session_state.buffer_ui[combo_key]
+
             with st.expander(f"{garment.replace('_', ' ').title()} Settings for `{design_name}`", expanded=False):
-                current_settings = st.session_state.settings[combo_key]
                 guide_folder = f"assets/guides/{garment}"
                 available_guides = sorted([f.split(".")[0] for f in os.listdir(guide_folder) if f.endswith(".png")])
-                guide = st.selectbox("Guide", available_guides, index=available_guides.index(current_settings["guide"]), key=f"{combo_key}_guide_ui")
-                scale = st.slider("Scale (%)", 50, 100, current_settings["scale"], key=f"{combo_key}_scale_ui")
-                offset = st.slider("Offset (px)", -100, 100, current_settings["offset"], key=f"{combo_key}_offset_ui")
+                buf["guide"] = st.selectbox("Guide", available_guides, index=available_guides.index(buf["guide"]), key=f"{combo_key}_guide")
+                buf["scale"] = st.slider("Scale (%)", 50, 100, buf["scale"], key=f"{combo_key}_scale")
+                buf["offset"] = st.slider("Offset (px)", -100, 100, buf["offset"], key=f"{combo_key}_offset")
 
                 col1, col2 = st.columns(2)
                 with col1:
                     if st.button(f"📋 Copy {garment} Settings", key=f"{combo_key}_copy"):
-                        st.session_state.copied_settings[garment] = {"guide": guide, "scale": scale, "offset": offset}
+                        st.session_state.copied_settings[garment] = buf.copy()
                         st.success(f"Copied settings for {garment}")
                 with col2:
                     if st.button(f"📥 Paste to All {garment.title()}", key=f"{combo_key}_paste"):
                         if garment in st.session_state.copied_settings:
                             copied = st.session_state.copied_settings[garment]
                             for uf in uploaded_files:
-                                other_design = uf.name.split('.')[0]
-                                other_key = f"{other_design}_{garment}"
-                                st.session_state.settings[other_key] = copied.copy()
+                                other_key = f"{uf.name.split('.')[0]}_{garment}"
+                                st.session_state.buffer_ui[other_key] = copied.copy()
                             st.success(f"Pasted to all {garment}")
 
                 if st.button(f"🔁 Refresh {garment} Preview", key=f"{combo_key}_refresh"):
-                    st.session_state.settings[combo_key] = {"guide": guide, "scale": scale, "offset": offset}
+                    st.session_state.settings[combo_key] = buf.copy()
                     st.session_state.rendered_once[combo_key] = True
 
             if not st.session_state.rendered_once[combo_key]:
-                st.session_state.rendered_once[combo_key] = True  # Only runs once after upload
+                st.session_state.rendered_once[combo_key] = True  # One-time render on load
 
             if st.session_state.rendered_once[combo_key]:
                 settings = st.session_state.settings[combo_key]
@@ -127,14 +130,12 @@ if uploaded_files:
                 py = box_y0 + (box_h - new_h) // 2 + settings["offset"]
                 composed = preview_shirt.copy()
                 composed.paste(fill, (px, py), fill)
-
                 st.session_state.previews[combo_key] = composed.convert("RGB")
 
             with cols[col_idx]:
                 st.image(st.session_state.previews.get(combo_key), caption=garment.replace("_", " ").title())
             col_idx = (col_idx + 1) % len(cols)
 
-# Export
 st.markdown("## 📦 Export All Mockups")
 if st.button("📁 Generate and Download ZIP"):
     output_zip = io.BytesIO()
