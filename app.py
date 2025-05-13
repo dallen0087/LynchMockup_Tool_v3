@@ -6,7 +6,7 @@ import io
 import os
 
 st.set_page_config(layout="wide")
-st.title("👕 LynchMockup_Tool v5.1 — Final Isolated Rendering")
+st.title("👕 LynchMockup_Tool v5.2 — Tab-Isolated Preview Mode")
 
 garments = {
     "tshirts": {"preview": "WHITE", "colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE", "PINK", "WHITE", "YELLOW"], "dark_colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE"]},
@@ -72,72 +72,70 @@ if uploaded_files:
     if not os.path.exists("temp_designs"):
         os.makedirs("temp_designs")
 
-    for uploaded_file in uploaded_files:
-        design_name = uploaded_file.name.split('.')[0]
-        design_path = f"temp_designs/{design_name}.png"
-        with open(design_path, "wb") as f:
-            f.write(uploaded_file.getvalue())
-        design = Image.open(design_path).convert("RGBA")
-        alpha = design.split()[-1]
-        bbox = alpha.getbbox()
-        cropped = design.crop(bbox)
+    tabs = st.tabs([f"{uf.name.split('.')[0]}" for uf in uploaded_files])
 
-        st.markdown(f"## Design: `{design_name}`")
-        cols = st.columns(len(garments))
-        col_idx = 0
+    for tab, uploaded_file in zip(tabs, uploaded_files):
+        with tab:
+            design_name = uploaded_file.name.split('.')[0]
+            design_path = f"temp_designs/{design_name}.png"
+            with open(design_path, "wb") as f:
+                f.write(uploaded_file.getvalue())
+            design = Image.open(design_path).convert("RGBA")
+            alpha = design.split()[-1]
+            bbox = alpha.getbbox()
+            cropped = design.crop(bbox)
 
-        for garment, config in garments.items():
-            combo_key = f"{design_name}_{garment}"
+            st.markdown(f"### Design: `{design_name}`")
+            cols = st.columns(len(garments))
+            col_idx = 0
 
-            if combo_key not in st.session_state.settings:
-                st.session_state.settings[combo_key] = {
-                    "scale": 100, "offset": 0, "guide": "STANDARD", "preview": config["preview"]
-                }
-
-            if combo_key not in st.session_state.buffer_ui:
-                st.session_state.buffer_ui[combo_key] = st.session_state.settings[combo_key].copy()
-
-            if combo_key not in st.session_state.has_rendered_once:
-                guide_img = Image.open(f"assets/guides/{garment}/STANDARD.png").convert("RGBA")
-                shirt_img = Image.open(f"assets/{garment}/{config['preview']}.jpg").convert("RGBA")
-                st.session_state.previews[combo_key] = render_preview(
-                    cropped, guide_img, shirt_img, st.session_state.settings[combo_key],
-                    color_mode, config["dark_colors"], color_hex_map
-                )
-                st.session_state.has_rendered_once[combo_key] = True
-
-            buf = st.session_state.buffer_ui[combo_key]
-            with st.expander(f"{garment.replace('_', ' ').title()} Settings for `{design_name}`", expanded=False):
-                guide_folder = f"assets/guides/{garment}"
-                guides = sorted([f.split(".")[0] for f in os.listdir(guide_folder) if f.endswith(".png")])
-                buf["guide"] = st.selectbox("Guide", guides, index=guides.index(buf["guide"]), key=f"{combo_key}_guide")
-                buf["scale"] = st.slider("Scale (%)", 50, 100, buf["scale"], key=f"{combo_key}_scale")
-                buf["offset"] = st.slider("Offset (px)", -100, 100, buf["offset"], key=f"{combo_key}_offset")
-
-                col1, col2 = st.columns(2)
-                with col1:
-                    if st.button(f"📋 Copy {garment} Settings", key=f"{combo_key}_copy"):
-                        st.session_state.copied_settings[garment] = buf.copy()
-                        st.success("Copied settings")
-                with col2:
-                    if st.button(f"📥 Paste to All {garment.title()}", key=f"{combo_key}_paste"):
-                        for uf in uploaded_files:
-                            other_key = f"{uf.name.split('.')[0]}_{garment}"
-                            st.session_state.buffer_ui[other_key] = st.session_state.copied_settings[garment].copy()
-                        st.success("Pasted settings")
-
-                if st.button(f"🔁 Refresh {garment} Preview", key=f"{combo_key}_refresh"):
-                    st.session_state.settings[combo_key] = buf.copy()
-                    guide_img = Image.open(f"assets/guides/{garment}/{buf['guide']}.png").convert("RGBA")
+            for garment, config in garments.items():
+                combo_key = f"{design_name}_{garment}"
+                if combo_key not in st.session_state.settings:
+                    st.session_state.settings[combo_key] = {"scale": 100, "offset": 0, "guide": "STANDARD", "preview": config["preview"]}
+                if combo_key not in st.session_state.buffer_ui:
+                    st.session_state.buffer_ui[combo_key] = st.session_state.settings[combo_key].copy()
+                if combo_key not in st.session_state.has_rendered_once:
+                    guide_img = Image.open(f"assets/guides/{garment}/STANDARD.png").convert("RGBA")
                     shirt_img = Image.open(f"assets/{garment}/{config['preview']}.jpg").convert("RGBA")
                     st.session_state.previews[combo_key] = render_preview(
-                        cropped, guide_img, shirt_img, buf, color_mode, config["dark_colors"], color_hex_map
+                        cropped, guide_img, shirt_img, st.session_state.settings[combo_key],
+                        color_mode, config["dark_colors"], color_hex_map
                     )
+                    st.session_state.has_rendered_once[combo_key] = True
 
-            if combo_key in st.session_state.previews:
-                with cols[col_idx]:
-                    st.image(st.session_state.previews[combo_key], caption=garment.replace("_", " ").title())
-            col_idx = (col_idx + 1) % len(cols)
+                buf = st.session_state.buffer_ui[combo_key]
+                with st.expander(f"{garment.replace('_', ' ').title()} Settings for `{design_name}`", expanded=False):
+                    guide_folder = f"assets/guides/{garment}"
+                    guides = sorted([f.split(".")[0] for f in os.listdir(guide_folder) if f.endswith(".png")])
+                    buf["guide"] = st.selectbox("Guide", guides, index=guides.index(buf["guide"]), key=f"{combo_key}_guide")
+                    buf["scale"] = st.slider("Scale (%)", 50, 100, buf["scale"], key=f"{combo_key}_scale")
+                    buf["offset"] = st.slider("Offset (px)", -100, 100, buf["offset"], key=f"{combo_key}_offset")
+
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button(f"📋 Copy {garment} Settings", key=f"{combo_key}_copy"):
+                            st.session_state.copied_settings[garment] = buf.copy()
+                            st.success("Copied settings")
+                    with col2:
+                        if st.button(f"📥 Paste to All {garment.title()}", key=f"{combo_key}_paste"):
+                            for uf2 in uploaded_files:
+                                other_key = f"{uf2.name.split('.')[0]}_{garment}"
+                                st.session_state.buffer_ui[other_key] = st.session_state.copied_settings[garment].copy()
+                            st.success("Pasted settings")
+
+                    if st.button(f"🔁 Refresh {garment} Preview", key=f"{combo_key}_refresh"):
+                        st.session_state.settings[combo_key] = buf.copy()
+                        guide_img = Image.open(f"assets/guides/{garment}/{buf['guide']}.png").convert("RGBA")
+                        shirt_img = Image.open(f"assets/{garment}/{config['preview']}.jpg").convert("RGBA")
+                        st.session_state.previews[combo_key] = render_preview(
+                            cropped, guide_img, shirt_img, buf, color_mode, config["dark_colors"], color_hex_map
+                        )
+
+                if combo_key in st.session_state.previews:
+                    with cols[col_idx]:
+                        st.image(st.session_state.previews[combo_key], caption=garment.replace("_", " ").title())
+                col_idx = (col_idx + 1) % len(cols)
 
     st.markdown("## 📦 Export All Mockups")
     if st.button("📁 Generate and Download ZIP"):
