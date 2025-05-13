@@ -6,7 +6,7 @@ import io
 import os
 
 st.set_page_config(layout="wide")
-st.title("👕 LynchMockup_Tool v5.2 — Tab-Isolated Preview Mode")
+st.title("👕 LynchMockup_Tool v5.3 — Manual Refresh + Master Refresh")
 
 garments = {
     "tshirts": {"preview": "WHITE", "colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE", "PINK", "WHITE", "YELLOW"], "dark_colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE"]},
@@ -73,6 +73,7 @@ if uploaded_files:
         os.makedirs("temp_designs")
 
     tabs = st.tabs([f"{uf.name.split('.')[0]}" for uf in uploaded_files])
+    refresh_queue = []
 
     for tab, uploaded_file in zip(tabs, uploaded_files):
         with tab:
@@ -136,6 +137,26 @@ if uploaded_files:
                     with cols[col_idx]:
                         st.image(st.session_state.previews[combo_key], caption=garment.replace("_", " ").title())
                 col_idx = (col_idx + 1) % len(cols)
+
+    st.markdown("## 🔁 Master Refresh")
+    if st.button("🔁 Refresh All Adjusted Previews"):
+        for combo_key, buf in st.session_state.buffer_ui.items():
+            if combo_key not in st.session_state.settings:
+                continue
+            if buf != st.session_state.settings[combo_key]:
+                design_name, garment = combo_key.split("_", 1)
+                design_path = f"temp_designs/{design_name}.png"
+                design = Image.open(design_path).convert("RGBA")
+                alpha = design.split()[-1]
+                bbox = alpha.getbbox()
+                cropped = design.crop(bbox)
+                guide_img = Image.open(f"assets/guides/{garment}/{buf['guide']}.png").convert("RGBA")
+                shirt_img = Image.open(f"assets/{garment}/{buf['preview']}.jpg").convert("RGBA")
+                st.session_state.previews[combo_key] = render_preview(
+                    cropped, guide_img, shirt_img, buf, color_mode, garments[garment]["dark_colors"], color_hex_map
+                )
+                st.session_state.settings[combo_key] = buf.copy()
+        st.success("All adjusted previews refreshed.")
 
     st.markdown("## 📦 Export All Mockups")
     if st.button("📁 Generate and Download ZIP"):
