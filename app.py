@@ -6,7 +6,7 @@ import io
 import os
 
 st.set_page_config(layout="wide")
-st.title("👕 LynchMockup_Tool v5.3 — Manual Refresh + Master Refresh")
+st.title("🟢THE_SHIRT_MATRIX🟢")
 
 garments = {
     "tshirts": {"preview": "WHITE", "colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE", "PINK", "WHITE", "YELLOW"], "dark_colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE"]},
@@ -16,7 +16,7 @@ garments = {
     "ringer_tees": {"preview": "WHITE-BLACK", "colors": ["BLACK-WHITE", "WHITE-BLACK", "WHITE-RED"], "dark_colors": ["BLACK-WHITE"]}
 }
 
-color_mode = st.selectbox("🎨 Design Color Mode", [
+color_mode = st.selectbox("🟢Design Color Mode🟢", [
     "Standard (Black/White)", "Blood Red", "Golden Orange", "Royal Blue", "Forest Green", "Unchanged"
 ])
 color_hex_map = {
