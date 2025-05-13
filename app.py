@@ -6,7 +6,7 @@ import io
 import os
 
 st.set_page_config(layout="wide")
-st.title("👕 LynchMockup_Tool v5.0 — Final Stable + Locked Rendering")
+st.title("👕 LynchMockup_Tool v5.1 — Final Isolated Rendering")
 
 garments = {
     "tshirts": {"preview": "WHITE", "colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE", "PINK", "WHITE", "YELLOW"], "dark_colors": ["BABY_BLUE", "BLACK", "GREEN", "MAROON", "NAVY_BLUE"]},
@@ -36,6 +36,9 @@ if "previews" not in st.session_state:
     st.session_state.previews = {}
 if "copied_settings" not in st.session_state:
     st.session_state.copied_settings = {}
+if "has_rendered_once" not in st.session_state:
+    st.session_state.has_rendered_once = {}
+
 def render_preview(cropped, guide_img, shirt_img, settings, color_mode, dark_colors, hex_map):
     alpha = np.array(guide_img.split()[-1])
     mask = alpha < 10
@@ -65,8 +68,6 @@ def render_preview(cropped, guide_img, shirt_img, settings, color_mode, dark_col
     composed = shirt_img.copy()
     composed.paste(fill, (px, py), fill)
     return composed.convert("RGB")
-
-
 if uploaded_files:
     if not os.path.exists("temp_designs"):
         os.makedirs("temp_designs")
@@ -87,10 +88,23 @@ if uploaded_files:
 
         for garment, config in garments.items():
             combo_key = f"{design_name}_{garment}"
+
             if combo_key not in st.session_state.settings:
-                st.session_state.settings[combo_key] = {"scale": 100, "offset": 0, "guide": "STANDARD", "preview": config["preview"]}
+                st.session_state.settings[combo_key] = {
+                    "scale": 100, "offset": 0, "guide": "STANDARD", "preview": config["preview"]
+                }
+
             if combo_key not in st.session_state.buffer_ui:
                 st.session_state.buffer_ui[combo_key] = st.session_state.settings[combo_key].copy()
+
+            if combo_key not in st.session_state.has_rendered_once:
+                guide_img = Image.open(f"assets/guides/{garment}/STANDARD.png").convert("RGBA")
+                shirt_img = Image.open(f"assets/{garment}/{config['preview']}.jpg").convert("RGBA")
+                st.session_state.previews[combo_key] = render_preview(
+                    cropped, guide_img, shirt_img, st.session_state.settings[combo_key],
+                    color_mode, config["dark_colors"], color_hex_map
+                )
+                st.session_state.has_rendered_once[combo_key] = True
 
             buf = st.session_state.buffer_ui[combo_key]
             with st.expander(f"{garment.replace('_', ' ').title()} Settings for `{design_name}`", expanded=False):
@@ -116,8 +130,9 @@ if uploaded_files:
                     st.session_state.settings[combo_key] = buf.copy()
                     guide_img = Image.open(f"assets/guides/{garment}/{buf['guide']}.png").convert("RGBA")
                     shirt_img = Image.open(f"assets/{garment}/{config['preview']}.jpg").convert("RGBA")
-                    composed = render_preview(cropped, guide_img, shirt_img, buf, color_mode, config["dark_colors"], color_hex_map)
-                    st.session_state.previews[combo_key] = composed
+                    st.session_state.previews[combo_key] = render_preview(
+                        cropped, guide_img, shirt_img, buf, color_mode, config["dark_colors"], color_hex_map
+                    )
 
             if combo_key in st.session_state.previews:
                 with cols[col_idx]:
